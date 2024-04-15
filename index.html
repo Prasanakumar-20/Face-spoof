@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Spoofing Detection System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: url('background-image.webp'); /* Replace 'background-image.jpg' with your image path */
+            background-size: cover;
+            background-position: center;
+        }
+
+        #container {
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8); /* Adjust the opacity and color as needed */
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #webcam-container {
+            margin-bottom: 20px;
+        }
+
+        #label-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .label-item {
+            width: 100px;
+            margin: 5px;
+            padding: 10px;
+            background-color: rgba(224, 224, 224, 0.8); /* Adjust the opacity and color as needed */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .highlight {
+            background-color: yellow; /* Adjust the highlight color */
+        }
+
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Face Spoofing Detection System</h1>
+        <button id="startButton" type="button" onclick="toggleCamera()">Start</button>
+        <div id="webcam-container"></div>
+        <div id="label-container"></div>
+    </div>
+    <button onclick="closeCamera()">Close</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script type="text/javascript">
+        const URL = "https://teachablemachine.withgoogle.com/models/gxJpqTnHB/";
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        async function init() {
+            try {
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                const flip = true;
+                webcam = new tmImage.Webcam(400, 400, flip);
+                await webcam.setup();
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+                for (let i = 0; i < maxPredictions; i++) {
+                    const labelItem = document.createElement("div");
+                    labelItem.classList.add("label-item");
+                    labelContainer.appendChild(labelItem);
+                }
+            } catch (error) {
+                console.error('Error initializing:', error);
+                alert('Error initializing the webcam. Please check your camera and try again.');
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let highestProbabilityIndex = 0;
+            let highestProbability = 0;
+            for (let i = 0; i < maxPredictions; i++) {
+                if (prediction[i].probability > highestProbability) {
+                    highestProbability = prediction[i].probability;
+                    highestProbabilityIndex = i;
+                }
+                const classPrediction =
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerText = classPrediction;
+            }
+
+            // Highlight the predicted class label
+            labelContainer.childNodes.forEach((item, index) => {
+                if (index === highestProbabilityIndex) {
+                    item.classList.add('highlight');
+                } else {
+                    item.classList.remove('highlight');
+                }
+            });
+        }
+
+        function toggleCamera() {
+            const startButton = document.getElementById("startButton");
+            if (!webcam) {
+                init();
+                startButton.innerText = "Stop";
+            } else {
+                webcam.pause();
+                webcam.stop();
+                webcam = null;
+                startButton.innerText = "Start";
+            }
+        }
+
+        function closeCamera() {
+            if (webcam) {
+                webcam.pause();
+                webcam.stop();
+                webcam = null;
+                document.getElementById("webcam-container").innerHTML = "";
+                const startButton = document.getElementById("startButton");
+                startButton.innerText = "Start";
+            }
+        }
+    </script>
+</body>
+</html>
